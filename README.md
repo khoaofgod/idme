@@ -50,7 +50,27 @@ idme domain<TAB>
 idme domainname.com
 ```
 
-## Installation
+## Quick Installation
+
+For a quick one-line installation, you can use wget or curl:
+
+### Using wget:
+
+```bash
+# As root
+mkdir -p /root/idme && wget -O /root/idme/idme https://raw.githubusercontent.com/khoaofgod/idme/main/idme && chmod +x /root/idme/idme && ln -sf /root/idme/idme /usr/local/bin/idme && idme setup
+```
+
+### Using curl:
+
+```bash
+# As root
+mkdir -p /root/idme && curl -o /root/idme/idme https://raw.githubusercontent.com/khoaofgod/idme/main/idme && chmod +x /root/idme/idme && ln -sf /root/idme/idme /usr/local/bin/idme && idme setup
+```
+
+After running either of these commands, the `idme` command will be available globally and tab completion will be set up for new shell sessions.
+
+## Manual Installation
 
 1. Clone the repository or copy the script to `/root/idme/`
 2. Run the setup command:
