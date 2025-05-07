@@ -1,0 +1,111 @@
+#!/bin/bash
+
+if [ "$1" == "hello" ]; then
+    echo "Hi"
+elif [ "$1" == "setup" ]; then
+    echo "Setting up idme command..."
+    
+    # Make sure script is executable
+    chmod +x /root/idme/idme
+    
+    # Create symlink in /usr/local/bin
+    ln -sf /root/idme/idme /usr/local/bin/idme
+    
+    # Create bash completion script
+    mkdir -p /etc/bash_completion.d
+    cat > /etc/bash_completion.d/idme << 'EOF'
+#!/bin/bash
+
+_idme_completions()
+{
+    local cur=${COMP_WORDS[COMP_CWORD]}
+    local prev=${COMP_WORDS[COMP_CWORD-1]}
+    
+    # If we're completing the command (first word)
+    if [ "$COMP_CWORD" -eq 1 ]; then
+        # Complete with "hello", "setup" or directories in /home
+        if [[ "$cur" == h* ]]; then
+            COMPREPLY=( $(compgen -W "hello" -- "$cur") )
+        elif [[ "$cur" == s* ]]; then
+            COMPREPLY=( $(compgen -W "setup" -- "$cur") )
+        else
+            # Get list of directories in /home that match the pattern
+            local domains=$(ls -d /home/* 2>/dev/null | grep -i "^/home/$cur" | sed 's|/home/||')
+            if [ -z "$domains" ]; then
+                # Try a more flexible match if no exact matches
+                domains=$(ls -d /home/* 2>/dev/null | grep -i "$cur" | sed 's|/home/||')
+            fi
+            COMPREPLY=( $(compgen -W "$domains" -- "$cur") )
+        fi
+    fi
+    
+    return 0
+}
+
+# Register the completion function for idme
+complete -F _idme_completions idme
+EOF
+    
+    # Make completion script executable
+    chmod +x /etc/bash_completion.d/idme
+    
+    # Source the completion script
+    source /etc/bash_completion.d/idme
+    
+    # Add to /etc/profile.d for system-wide loading
+    cat > /etc/profile.d/idme.sh << 'EOF'
+#!/bin/bash
+if [ -f /etc/bash_completion.d/idme ]; then
+    source /etc/bash_completion.d/idme
+fi
+EOF
+    chmod +x /etc/profile.d/idme.sh
+    
+    echo "Setup complete! Tab completion is now available for idme command."
+    echo "For new shell sessions, tab completion will work automatically."
+    echo "For your current shell, the completion has been loaded."
+    
+elif [ -n "$1" ] && [ -d "/home/$1" ]; then
+    domain="$1"
+    
+    # Try to get owner - use fallbacks for different stat versions
+    if stat --version 2>/dev/null | grep -q GNU; then
+        # GNU stat (used in AlmaLinux, CentOS, etc.)
+        owner=$(stat -c '%U' "/home/$domain" 2>/dev/null)
+    elif stat --version 2>/dev/null | grep -q BSD; then
+        # BSD stat (used in some distributions)
+        owner=$(stat -f '%Su' "/home/$domain" 2>/dev/null)
+    else
+        # Fallback method using ls
+        owner=$(ls -ld "/home/$domain" | awk '{print $3}')
+    fi
+    
+    if [ -n "$owner" ]; then
+        # Check if sudo exists
+        if command -v sudo >/dev/null 2>&1; then
+            sudo su - "$owner"
+        else
+            su - "$owner"
+        fi
+    else
+        echo "Owner not found for /home/$domain"
+    fi
+else
+    # Run setup automatically if not already set up
+    if [ ! -f /etc/bash_completion.d/idme ]; then
+        echo "First-time setup: Installing command and tab completion..."
+        $0 setup
+    fi
+    
+    echo "Usage: idme hello    - Prints a simple greeting"
+    echo "       idme setup    - Sets up the command with tab completion"
+    echo "       idme DOMAIN   - Switches to the user who owns /home/DOMAIN"
+    echo ""
+    echo "Tab completion is available for domain names."
+    echo "Type 'idme' followed by part of a domain name and press Tab to complete it."
+    echo ""
+    echo "Note: If tab completion isn't working, either:"
+    echo "  1. Open a new terminal window, or"
+    echo "  2. Run: source /etc/bash_completion.d/idme"
+    echo "  3. Log out and log back in"
+fi
